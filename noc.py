@@ -1,12 +1,54 @@
 #!/usr/bin/env python
 import paramiko
 import telnetlib
-import cmd
+import subprocess
+import re
 import sys
 import time
+import optparse
 import os
+import cmd
 
 
+#Eventual Command-line option parser to be implemented with multiple modules--------
+#parser = optparse.OptionParser()
+#parser.add_option('-p', '--ping', dest = 'ping_option', action='store_true', default=True)
+#parser.add_option('-d', '--diagnostic', dest = 'diag_option', action = 'store_true', default = False)
+
+
+def massPing():
+
+        #--------------------------------
+        #| Asks user for a block of text |
+        #| Filters out valid IP's using  |
+        #| a regex, appends them to a    |
+        #| Tuple, and outputs UP or DOWN |
+        #| result for each valid address |
+        #--------------------------------
+
+        pattern = r"((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)([ (\[]?(\.|dot)[ )\]]?(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3})"
+        print('Paste block of Text Containing IP addresses to be pinged: (Press Ctrl+D when Finished) \n\n')
+        block = sys.stdin.read()
+        ips = [each[0] for each in re.findall(pattern, block)]
+        upCount = 0
+        downCount = 0
+        print ("\n\n############################################")
+        print ("#                                          #")
+        print ("#        Performing Mass-Ping Test         #")
+        print ("#                                          #")
+        print ("############################################\n")
+        for ip in ips:
+            FNULL = open(os.devnull, 'w')
+            output = subprocess.call(['ping', '-c 2', ip], stdout=FNULL, stderr=subprocess.STDOUT)
+            if output == 1:
+                print('Failure: ' + ip + ' is Unreachable.')
+                downCount += 1
+            else:
+                print('Success: ' + ip + ' is Up and Reachable.')
+                upCount += 1
+        print('\nFinished pinging all IP Addresses')
+        print('Results: ' + str(upCount) + ' Hosts Up / ' + str(downCount) + ' Hosts Down.\n')
+        exit()
 
 
 def connect():
@@ -17,6 +59,12 @@ def connect():
         ip = raw_input("IP Address:")
         user = raw_input("Username:")
         passw = _raw_input("Password:")
+
+        print ("\n\n############################################")
+        print ("#                                          #")
+        print ("#        Pulling Device Statistics         #")
+        print ("#                                          #")
+        print ("############################################\n")
 
         #-------------------------------------------------------
         #| Begin SSH connection using Paramiko - Only available |
@@ -34,33 +82,34 @@ def connect():
         #|  Example: show log and having to press Space to scroll  |
         #----------------------------------------------------------
         chan.send('terminal length 0'+'\n')
+        print ('\n-------------------------------------\n')
         print showClock(chan)
-        print '\n'
+        print ('\n-------------------------------------\n')
         print showVer(chan)
-        print '\n'
+        print ('\n-------------------------------------\n')
         print showLog(chan)
-        print '\n'
+        print ('\n-------------------------------------\n')
         print intDesc(chan)
-        print '\n'
+        print ('\n-------------------------------------\n')
         print intSumm(chan)
-        print '\n'
+        print ('\n-------------------------------------\n')
 
         #----------------------------------------------------------------
         #| If device is a router - execute Routing summary show commands.|
         #----------------------------------------------------------------
         reply = raw_input("Is this device a Router? Y/N ... ").lower()
         if reply == 'y':
-            print '\n'
+            print ('\n-------------------------------------\n')
             print showBGP(chan)
-            print '\n'
+            print ('\n-------------------------------------\n')
             print showOSPF(chan)
-            print '\n'
+            print ('\n-------------------------------------\n')
             print showEIGRP(chan)
-            print '\n'
+            print ('\n-------------------------------------\n')
             print 'Finished!'
             chan.send('exit'+'\n')
         else:
-            print '\n'
+            print ('\n-------------------------------------\n')
             print 'Finished!'
             chan.send('exit'+'\n')
         chan.close()
@@ -72,24 +121,44 @@ def telConnect():
         host = raw_input("IP Address: ")
         username = raw_input("Username: ")
         password = _raw_input("Password: ")
+
+        print ("\n\n############################################")
+        print ("#                                          #")
+        print ("#        Pulling Device Statistics         #")
+        print ("#                                          #")
+        print ("############################################\n")
+
         tn = telnetlib.Telnet(host)
         tn.read_until("Username:")
         tn.write(username+"\n")
         tn.read_until("Password:")
         tn.write(password+"\n")
+
         tn.write("terminal length 0"+"\n")
+        print ('\n-------------------------------------\n')
         tn.write("sh clock"+"\n")
-        tn.write("sh version"+"\n")
+        print ('\n-------------------------------------\n')
+        tn.write("sh version | i uptime"+"\n")
+        print ('\n-------------------------------------\n')
         tn.write("sh log"+"\n")
+        print ('\n-------------------------------------\n')
         tn.write("sh int desc"+"\n")
+        print ('\n-------------------------------------\n')
         tn.write("sh int summ"+"\n")
+        print ('\n-------------------------------------\n')
         reply = raw_input("Is this device a Router? Y/N ... ").lower()
         if reply == 'y':
+                print ('\n-------------------------------------\n')
                 tn.write("show ip bgp summ"+"\n")
+                print ('\n-------------------------------------\n')
                 tn.write("show ip bgp summ"+"\n")
+                print ('\n-------------------------------------\n')
                 tn.write("show ip bgp summ"+"\n")
+                print ('\n-------------------------------------\n')
+                print ('Finished!')
                 tn.write("exit"+"\n")
         else:
+                print ('Finished!')
                 tn.write("exit"+"\n")
         output = tn.read_all()
         tn.close()
@@ -124,8 +193,8 @@ def showClock(chan):
         chan.send('show clock')
         chan.send('\n')
         time.sleep(1)
-        clock = chan.recv(1000)
-        return clock
+        summ = chan.recv(1000)
+        return summ
 
 
 
@@ -133,8 +202,8 @@ def showClock(chan):
 def showVer(chan):
         chan.send('show ver | i uptime'+'\n')
         time.sleep(1)
-        version = chan.recv(1000)
-        return version
+        summ = chan.recv(1000)
+        return summ
 
 
 
@@ -142,8 +211,8 @@ def showVer(chan):
 def showLog(chan):
         chan.send('show log'+'\n')
         time.sleep(3)
-        log = chan.recv(9999)
-        return log
+        summ = chan.recv(9999)
+        return summ
 
 
 
@@ -151,8 +220,8 @@ def showLog(chan):
 def intDesc(chan):
         chan.send('show int desc'+'\n')
         time.sleep(1)
-        results = str(chan.recv(9999))
-        return results
+        summ = str(chan.recv(9999))
+        return summ
 
 
 
@@ -192,22 +261,27 @@ def showOSPF(chan):
 
 
 
-
+print ("\n")
 print ("############################################")
-print ("#                NOC - SPEED               #")
-print ("#                Written By                #")
-print ("#                  Travis                  #")
+print ("#           Welcome to NOC Magic           #")
+print ("#                ++++++++++                #")
+print ("#             Written by Travis            #")
+print ("#            root{at}info5ec.com           #")
 print ("############################################\n")
 
 
 
 def main():
-        userInput = raw_input("[  SSH / TELNET ... (SSH)  ]  ").lower()
-        if userInput == '':
-                connect()
-        elif userInput.find("s") == 1:
-                connect()
+        answer = raw_input("Press 1 for MassPing -OR- Press Enter for Diagnostics ... ")
+        if answer == 1:
+            massPing()
         else:
+            userInput = raw_input("[  SSH / TELNET ... (SSH)  ]  ").lower()
+            if userInput == '':
+                connect()
+            elif userInput.find("s") == 's':
+                connect()
+            else:
                 print telConnect()
 
 
